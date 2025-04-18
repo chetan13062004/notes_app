@@ -1,39 +1,45 @@
-// Importing Modules
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const path = require('path');
+require('dotenv').config();
 
-// Inititating Express
 const app = express();
 
-// Environment Variables
-require("dotenv").config();
+// Middleware
+app.use(cors());
+app.use(express.json());
 
-// Connecting to Database
+// API routes
+app.use('/api/notes', require('./routes/noteRoutes'));
+app.use('/api/messages', require('./routes/messageRoutes'));
+
+// For production deployment on Vercel
+if (process.env.NODE_ENV === 'production') {
+  // Serve static files from the frontend build
+  const __dirname = path.resolve();
+  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+  
+  // Handle all other routes by serving the index.html
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+  });
+}
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ msg: 'Server Error', error: err.message });
+});
+
+const PORT = process.env.PORT || 5000;
+
 mongoose
-  .connect(process.env.dbURL, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
-  .then((result) =>
-    app.listen(process.env.PORT || 3000, () => {
-      console.log("Connection to the Database was established!");
-    })
-  )
   .catch((error) => console.log(error));
 
-// Middlewares
-app.use(express.json()); // JSON Parser
-app.use(express.urlencoded({ extended: true })); // URL Body Parser
-
-// CORS
-app.use(
-  cors({
-    origin: "*",
-    // credentials: true,
-  })
-);
-
-// Routes
-const routes = require("./routes/routes");
-app.use(routes);
+// For Vercel serverless deployment
+module.exports = app;
